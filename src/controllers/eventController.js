@@ -1,0 +1,1 @@
+import Event from "../models/Event.js";
