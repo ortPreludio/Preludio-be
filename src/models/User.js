@@ -1,23 +1,28 @@
-import mongoose from 'mongoose'
+import { Schema, model } from 'mongoose';
 
-const userSchema = mongoose.Schema({
+const UserSchema = new Schema(
+    {
     nombre: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     apellido: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     dni: {
         type: String,
         required: true,
-        unique: true // Recomendado para que no se repita
+        unique: true,
+        trim: true 
     },
     email: {
         type: String,
         required: true,
-        unique: true // Recomendado para que no se repita
+        unique: true,
+        trim: true 
     },
     password: {
         type: String,
@@ -29,7 +34,8 @@ const userSchema = mongoose.Schema({
     },
     telefono: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     rol: {
         type: String,
@@ -42,9 +48,18 @@ const userSchema = mongoose.Schema({
     }],
     eventosCreados: [{
         type: Schema.Types.ObjectId,
-        ref: 'Evento' // Referencia al modelo 'Evento'
+        ref: 'Event' // Referencia al modelo 'Event'
     }]
 }, { timestamps: true })
 
+UserSchema.index({ email: 1 }, { unique: true });
+UserSchema.index({ dni: 1 }, { unique: true });
 
-export default mongoose.model("User", userSchema)
+UserSchema.pre('save', function (next) {
+  if (this.isModified('email') && this.email) {
+    this.email = this.email.trim().toLowerCase();
+  }
+  next();
+});
+
+export default model("User", UserSchema)
