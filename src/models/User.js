@@ -22,7 +22,8 @@ const UserSchema = new Schema(
         type: String,
         required: true,
         unique: true,
-        trim: true 
+        trim: true,
+        lowercase: true // Supuestamente mongoose debería convertirlo en minus incluso al hacer un update
     },
     password: {
         type: String,
@@ -54,12 +55,5 @@ const UserSchema = new Schema(
 
 UserSchema.index({ email: 1 }, { unique: true });
 UserSchema.index({ dni: 1 }, { unique: true });
-
-UserSchema.pre('save', function (next) {
-  if (this.isModified('email') && this.email) {
-    this.email = this.email.trim().toLowerCase();
-  }
-  next();
-});
 
 export default model("User", UserSchema)
