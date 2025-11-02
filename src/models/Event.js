@@ -6,6 +6,19 @@ const UbicacionSchema = new Schema(
     direccion: { type: String, required: true, trim: true },
     ciudad: { type: String, required: true, trim: true },
     provincia: { type: String, required: true, trim: true },
+    /* Coords geograficas para orden/filtrado por cercanía, a posteriori estaria 
+     bueno meter api para obtenerlas automaticamente al setearle la ubicación al evento */
+    geo: {
+      type: {
+        type: String,
+        enum: ['Point'],
+        default: undefined
+      },
+      coordinates: {
+        type: [Number], // [lng, lat]
+        default: undefined
+      }
+    }
   },
   { _id: false }
 );
@@ -46,20 +59,20 @@ const EventSchema = new Schema(
     // --- Campos de la imagen ---
     // la imagen tiene campos duplicados (precio/precioBase, capacidad/capacidadTotal, etc.)
     // los incluimos todos tal cual están en la imagen.
-
-    precioBase: { // Para no duplicar se usa alias
+    // Para no duplicar se usa alias
+    precioBase: { 
         type: Number,
         required: true,
         min: 0,
         alias: 'precio'
     },
-    capacidadTotal: { // Para no duplicar se usa alias
+    capacidadTotal: { 
         type: Number,
         required: true,
         min: 0,
         alias: 'capacidad'
     },
-    entradasDisponibles: { // Para no duplicar se usa alias
+    entradasDisponibles: {
         type: Number,
         required: true,
         min: 0,
@@ -122,5 +135,8 @@ EventSchema.pre('validate', function (next) {
   }
   next();
 });
+EventSchema.index({ estadoPublicacion: 1, fecha: 1, hora: 1, _id: 1 });
+EventSchema.index({ categoria: 1, fecha: 1 });
+EventSchema.index({ 'ubicacion.geo': '2dsphere' });
 
 export default model('Event', EventSchema);
