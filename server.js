@@ -2,7 +2,7 @@ import express from "express"
 import dotenv from "dotenv"
 
 import { users } from "./src/data/users.js"
-import { apiRouter } from './routes/index.js';
+import { apiRouter } from './src/routes/index.js';
 import conectarDB from "./src/config/db.js"
 
 dotenv.config()

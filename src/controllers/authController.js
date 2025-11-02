@@ -2,6 +2,11 @@ import User from "../models/User.js";
 import bcrypt from "bcryptjs"
 import jwt from "jsonwebtoken";
 
+function sign(user) {
+  const payload = { id: user._id.toString(), rol: user.rol, email: user.email };
+  return jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
+}
+
 const generarAccessToken = (user) => {
         //JWT.Sign
         // primer argumento, lo que vas a encriptar
@@ -26,51 +31,65 @@ const generarRefreshToken = (user) => {
         { expiresIn: "7d"} 
     )
 }
-
-export const login = async (req, res) =>{
-
-
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-        res.status(400).json({
-            error: "Faltan Email o Password"
-        })
-    }
-
-    try {
-
-        const user = await User.findOne({email})
-
-        if(!user){
-            return res.status(404).json({error: "Usuario no encontrado"})
-        }
-
-        const match = await bcrypt.compare(password, user.password)
-
-        if(!match){
-            return res.status(401).json({error: "Email o Password incorrectos"})
-        }
-
-        const accessToken = generarAccessToken(user)
-
-        const refreshToken = generarRefreshToken(user)
-
-        res.cookie('refreshToken', refreshToken,{
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production', // solo https en produccion
-            sameSite: 'strict',
-            maxAge: 1000 * 60 * 60 * 24 * 7
-        })
-
-        // Mandar el refresh token como cookie
-        res.json({accessToken})
- 
-    } catch (error) {
-        
-    }
-    
+// ¿Hay al menos un ADMIN ya creado?
+async function canCreateAdmin() {
+  const count = await User.countDocuments({ rol: 'ADMIN' });
+  return count === 0;
 }
+
+export const register = async (req, res) => {
+  const { nombre, apellido, dni, email, password, fechaNacimiento, telefono, rol } = req.body || {};
+  if (!nombre || !apellido || !dni || !email || !password || !fechaNacimiento || !telefono) {
+    console.log(res);
+    
+    return res.status(400).json({ message: 'Faltan campos requeridos' });
+  }
+
+  const exists = await User.findOne({ $or: [{ email: email.toLowerCase() }, { dni }] }).lean();
+  if (exists) return res.status(409).json({ message: 'Email o DNI ya registrados' });
+
+  const hash = await bcrypt.hash(password, 10);
+  let finalRol = 'USUARIO';
+
+  // Si ya hay un ADMIN en el sistema, solo ADMINs autenticados pueden crear otro ADMIN (este endpoint público no lo permite)
+  if (rol === 'ADMIN') {
+    if (await canCreateAdmin()) {
+      finalRol = 'ADMIN';
+    } else {
+      return res.status(403).json({ message: 'No autorizado para crear ADMIN' });
+    }
+  }
+
+  const user = await User.create({
+    nombre, apellido, dni, email, password: hash, fechaNacimiento, telefono, rol: finalRol
+  });
+
+  const token = sign(user);
+  res.status(201).json({ token, user: { id: user._id, nombre, apellido, email: user.email, rol: user.rol } });
+};
+
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Faltan credenciales' });
+    }
+    const emailNorm = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: emailNorm });
+    if (!user) return res.status(401).json({ message: 'Credenciales inválidas' });
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: 'Credenciales inválidas' });
+
+    const token = sign(user);
+    res.json({
+      token,
+      user: { id: user._id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol }
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error en login', error: err.message });
+  }
+};
 
 export const refreshToken = (req, res) => {
 
