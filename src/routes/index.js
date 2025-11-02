@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import events from './events.routes.js';
+import events from './eventsRoutes.js';
 
 const r = Router();
 r.use('/events', events);

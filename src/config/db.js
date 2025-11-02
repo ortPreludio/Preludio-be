@@ -1,16 +1,25 @@
-import dotenv from 'dotenv'
-import mongoose from "mongoose"
+// src/config/db.js
+import mongoose from 'mongoose';
 
-dotenv.config()
+export async function conectarDB() {
+  const uri = process.env.MONGODB_URI; // sin /DB al final (solo el cluster)
+  if (!uri) throw new Error('MONGODB_URI no está definido');
 
-const conectarDB = async () => {
-    try {
+  // APP_ENV: 'production' o 'staging' (default)
+  const appEnv = process.env.APP_ENV || process.env.NODE_ENV || 'staging';
 
-        await mongoose.connect(process.env.MONGODB_URI)
-        
-    } catch (error) {
-        console.error("Error al conectar con MONGODB: ", error.message)
-    }
+  // Permite override por flag: node src/index.js --db=Production
+  const flagDb = process.argv.find(a => a.startsWith('--db='))?.split('=')[1];
+
+  // Nombres configurables por .env
+  const dbName =
+    flagDb ||
+    (appEnv === 'production' ? process.env.DB_NAME_PROD : process.env.DB_NAME_STAGING) ||
+    'staging';
+
+  mongoose.set('strictQuery', true);
+  await mongoose.connect(uri, { dbName });
+
+  console.log(`[DB] conectado a "${dbName}" (env=${appEnv})`);
 }
-
 export default conectarDB
