@@ -1,6 +1,10 @@
 import { Router } from 'express';
-import events from './eventsRoutes.js';
+import { authRouter } from './auth.routes.js';
+import { eventsRouter } from './events.routes.js';
 
-const r = Router();
-r.use('/events', events);
-export default r;
+export const apiRouter = Router();
+apiRouter.use('/auth', authRouter);
+apiRouter.use('/events', eventsRouter);
+
+// health endpoint por si llegamos a levantar el proyecto en cloud :)
+apiRouter.get('/health', (req, res) => res.json({ ok: true, service: 'preludio-api' }));

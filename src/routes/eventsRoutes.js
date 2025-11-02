@@ -5,20 +5,18 @@ import {
   listEventsByRole,
   getEventByRole,
   createEvent,
-  updateEvent,
+  updateEvent
 } from '../controllers/eventController.js';
 
-const r = Router();
+export const eventsRouter = Router();
 
-// pública (home)
-r.get('/public', listPublishedEvents);
+// público (anónimo)
+eventsRouter.get('/public', listPublishedEvents);
 
-// autenticada
-r.get('/', requireAuth, listEventsByRole);
-r.get('/:id', requireAuth, getEventByRole);
+// autenticado
+eventsRouter.get('/', requireAuth, listEventsByRole);
+eventsRouter.get('/:id', requireAuth, getEventByRole);
 
-// gestión (admin)
-r.post('/', requireAuth, roleGate('ADMIN'), createEvent);
-r.patch('/:id', requireAuth, roleGate('ADMIN'), updateEvent);
-
-export default r;
+// admin
+eventsRouter.post('/', requireAuth, roleGate('ADMIN'), createEvent);
+eventsRouter.patch('/:id', requireAuth, roleGate('ADMIN'), updateEvent);
