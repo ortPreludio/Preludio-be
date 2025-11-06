@@ -1,12 +1,16 @@
-import express from 'express'
-import { getUsers, createUser, getUsersSearch } from '../controllers/usersController.js'
+import { Router } from "express";
+import { listUsers, createUser, getMe, updateMe } from "../controllers/usersController.js";
+import { protegerRuta, roleGate } from "../middlewares/auth.js";
 
-const router = express.Router()
+const usersRouter = Router();
 
-// /api/users/
-router.get("/", getUsers)
-router.get("/search", getUsersSearch)
+// GET /api/users  -> lista paginada (solo ADMIN)
+usersRouter.get("/", protegerRuta, roleGate("ADMIN"), listUsers);
+// POST /api/users -> crear (ADMIN)
+usersRouter.post("/", protegerRuta, roleGate("ADMIN"), createUser);
 
-router.post("/", createUser)
+// Perfil propio
+usersRouter.get("/me", protegerRuta, getMe);
+usersRouter.patch("/me", protegerRuta, updateMe);
 
-export default router
+export { usersRouter };
