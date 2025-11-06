@@ -2,6 +2,9 @@ import jwt from "jsonwebtoken";
 
 function extractToken(req) {
   const h = req.headers.authorization;
+  const bearer = h?.startsWith("Bearer ") ? h.slice(7) : null;
+  const token = req.cookies?.token || bearer;
+
   if (h?.startsWith("Bearer ")) return h.slice(7);
   return req.cookies?.token || null;
 }
