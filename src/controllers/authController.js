@@ -80,6 +80,7 @@ export const register = async (req, res) => {
   });
 };
 
+// -------- Login --------
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -108,6 +109,7 @@ export const login = async (req, res) => {
   }
 };
 
+// -------- Refresh (opcional) --------
 export const refreshToken = (req, res) => {
   const token = req.cookies?.refreshToken;
   if (!token) return res.status(401).json({ error: "No hay refreshToken" });
