@@ -34,36 +34,36 @@ export const listUsers = async (req, res) => {
   }
 };
 
-export const getUsers = async (req, res) => {
+export const listUsers = async (req, res) => {
+  try {
+    const { q = "", page = 1, limit = 10, sort = "createdAt", order = "desc" } = req.query;
 
+    const pageNum = clamp(parseInt(page, 10) || 1, 1, 10_000);
+    const perPage = clamp(parseInt(limit, 10) || 10, 1, 100);
+    const skip = (pageNum - 1) * perPage;
+    const sortDir = order === "asc" ? 1 : -1;
 
-    try {
-
-        const user = await User.find()
-        res.json(user)
-
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener users", errorMsg: error})
+    const filter = {};
+    if (q) {
+      const rx = new RegExp(esc(q), "i");
+      filter.$or = [
+        { nombre: rx }, { apellido: rx }, { email: rx },
+        { dni: rx }, { telefono: rx }, { rol: rx },
+      ];
     }
-}
 
-export const getUsersSearch = async (req, res) => {
+    const [items, total] = await Promise.all([
+      User.find(filter)
+        .sort({ [sort]: sortDir, _id: sort === "createdAt" ? sortDir : 1 })
+        .skip(skip).limit(perPage).lean(),
+      User.countDocuments(filter),
+    ]);
 
-    const {nombre} = req.query
-
-    try {
-
-        const user = await User.find({
-            nombre: { 
-                $regex: `^${nombre}`,
-                $options: 'i'}
-        })
-        res.json(user)
-
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener users", errorMsg: error})
-    }
-}
+    res.json({ items, total, page: pageNum, limit: perPage });
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener usuarios", errorMsg: error?.message || error });
+  }
+};
 
 export const createUser = async (req, res) => {
   try {
