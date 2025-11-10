@@ -18,6 +18,7 @@ export const protegerRuta = (req, res, next) => {
 
     console.log("decodificado: ", decodificado);
 
+    req.user = decodificado;
 
     next()
 

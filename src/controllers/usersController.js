@@ -60,3 +60,58 @@ export const createUser = async (req, res) => {
     }
 
 }
+
+export const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id; // Asumiendo que tenés middleware de autenticación
+    const { nombre, apellido, dni, email, telefono, fechaNacimiento } = req.body;
+
+    // Validaciones básicas
+    if (!nombre || !apellido || !dni || !email || !telefono || !fechaNacimiento) {
+      return res.status(400).json({ message: 'Todos los campos son requeridos' });
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Email inválido' });
+    }
+
+    // Validar DNI (7-10 dígitos)
+    if (!/^\d{7,10}$/.test(dni)) {
+      return res.status(400).json({ message: 'DNI inválido' });
+    }
+
+    // Validar teléfono (6-15 dígitos)
+    if (!/^\d{6,15}$/.test(telefono)) {
+      return res.status(400).json({ message: 'Teléfono inválido' });
+    }
+
+    // Actualizar en la base de datos
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      {
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        dni: dni.trim(),
+        email: email.trim().toLowerCase(),
+        telefono: telefono.trim(),
+        fechaNacimiento
+      },
+      { new: true, runValidators: true }
+    ).select('-password'); // No devolver la contraseña
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    res.json({ 
+      message: 'Perfil actualizado correctamente',
+      user: updatedUser 
+    });
+
+  } catch (error) {
+    console.error('Error al actualizar perfil:', error);
+    res.status(500).json({ message: 'Error al actualizar el perfil' });
+  }
+};
