@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { listUsers, getMe, updateMe, getUsers, createUser, getUsersSearch, getUserById } from "../controllers/usersController.js";
 import { protegerRuta, roleGate } from "../middlewares/auth.js";
+import { updateProfile } from '../controllers/usersController.js';
 
 const usersRouter = Router();
 
@@ -19,5 +20,6 @@ usersRouter.get("/search", getUsersSearch);
 usersRouter.get("/:id", protegerRuta, getUserById); // Nueva ruta - debe ir después de /search
 usersRouter.get("/", protegerRuta, getUsers); //comparar con listUsers
 usersRouter.get("/search", protegerRuta, getUsersSearch)
+usersRouter.put('/profile', protegerRuta, updateProfile);
 
 export { usersRouter };

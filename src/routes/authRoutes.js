@@ -1,14 +1,12 @@
 import { Router } from 'express';
 import { register, login, logout } from '../controllers/authController.js';
 import { requireAuth } from "../middlewares/auth.js";
-import { updateProfile } from '../controllers/usersController.js';
-
 
 export const authRouter = Router();
 authRouter.post('/register', register);
 authRouter.post('/login', login);
 authRouter.post('/logout', logout)
-authRouter.put('/profile', requireAuth, updateProfile);
+
 authRouter.get('/me', requireAuth, async (req, res) => {
   const User = (await import("../models/User.js")).default;
   const u = await User.findById(req.user.id).lean();
