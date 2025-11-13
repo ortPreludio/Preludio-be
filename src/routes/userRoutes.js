@@ -1,15 +1,23 @@
-import express from 'express'
-import { getUsers, createUser, getUsersSearch, getUserById } from '../controllers/usersController.js'
-import { protegerRuta } from '../middlewares/authMiddleware.js'
+import { Router } from "express";
+import { listUsers, getMe, updateMe, getUsers, createUser, getUsersSearch, getUserById } from "../controllers/usersController.js";
+import { protegerRuta, roleGate } from "../middlewares/auth.js";
 
-const router = express.Router()
+const usersRouter = Router();
 
-// /api/users/
-router.get("/", getUsers)
-router.get("/search", getUsersSearch)
-router.get("/:id", protegerRuta, getUserById) // Nueva ruta - debe ir después de /search
-router.get("/", protegerRuta, getUsers)
-router.get("/search", protegerRuta, getUsersSearch)
-router.post("/", createUser)
+// GET /api/users  -> lista paginada (solo ADMIN)
+usersRouter.get("/", protegerRuta, roleGate("ADMIN"), listUsers);
+// POST /api/users -> crear (ADMIN)
+usersRouter.post("/", protegerRuta, roleGate("ADMIN"), createUser);
 
-export default routerUnauthorized
+// Perfil propio
+usersRouter.get("/me", protegerRuta, getMe);
+usersRouter.patch("/me", protegerRuta, updateMe);
+
+// Rutas públicas
+usersRouter.get("/", getUsers); //comparar con listUsers
+usersRouter.get("/search", getUsersSearch);
+usersRouter.get("/:id", protegerRuta, getUserById); // Nueva ruta - debe ir después de /search
+usersRouter.get("/", protegerRuta, getUsers); //comparar con listUsers
+usersRouter.get("/search", protegerRuta, getUsersSearch)
+
+export { usersRouter };
