@@ -168,3 +168,64 @@ export const getUsersSearch = async (req, res) => {
         res.status(500).json({ error: "Error al obtener users", errorMsg: error})
     }
 }
+
+// metodo para que el admin pueda actualizar cualquier usuario por id
+
+export const updateUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, apellido, dni, email, telefono, fechaNacimiento, rol } = req.body;
+
+    // Validaciones básicas
+    if (!nombre || !apellido || !dni || !email || !telefono || !fechaNacimiento) {
+      return res.status(400).json({ message: 'Todos los campos son requeridos' });
+    }
+
+    // Validar formato de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Email inválido' });
+    }
+
+    // Validar DNI (7-10 dígitos)
+    if (!/^\d{7,10}$/.test(dni)) {
+      return res.status(400).json({ message: 'DNI inválido' });
+    }
+
+    // Validar teléfono (6-15 dígitos)
+    if (!/^\d{6,15}$/.test(telefono)) {
+      return res.status(400).json({ message: 'Teléfono inválido' });
+    }
+
+    // Actualizar usuario
+    const updatedUser = await User.findByIdAndUpdate(
+      id,
+      {
+        nombre: nombre.trim(),
+        apellido: apellido.trim(),
+        dni: dni.trim(),
+        email: email.trim().toLowerCase(),
+        telefono: telefono.trim(),
+        fechaNacimiento,
+        rol
+      },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+
+    res.json({ 
+      message: 'Usuario actualizado correctamente',
+      user: updatedUser 
+    });
+
+  } catch (error) {
+    console.error('Error al actualizar usuario:', error);
+    if (error.code === 11000) {
+      return res.status(409).json({ error: "Email o DNI duplicado" });
+    }
+    res.status(500).json({ message: 'Error al actualizar el usuario' });
+  }
+};
