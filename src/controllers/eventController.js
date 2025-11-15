@@ -77,7 +77,7 @@ export const createEvent = async (req, res) => {
 
 export const updateEvent = async (req, res) => {
   try {
-    // Prevent changing the creator via update
+    // Handleamos modificar el creator si viene en el body
     if (req.body.creador) delete req.body.creador;
     const ev = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
     if (!ev) return res.status(404).json({ message: "No encontrado" });
