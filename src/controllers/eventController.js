@@ -62,12 +62,27 @@ export const getEventByRole = async (req, res) => {
 };
 
 export const createEvent = async (req, res) => {
-  const ev = await Event.create(req.body);
-  res.status(201).json(ev);
+  try {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    // `req.user` created by auth middleware contains `id` (or sometimes `_id`),
+    // ensure we use whichever is present.
+    const userId = req.user.id || req.user._id;
+    const payload = { ...req.body, creador: userId };
+    const ev = await Event.create(payload);
+    res.status(201).json(ev);
+  } catch (error) {
+    res.status(400).json({ error: 'Error al crear evento', errorMsg: error?.message || error });
+  }
 };
 
 export const updateEvent = async (req, res) => {
-  const ev = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-  if (!ev) return res.status(404).json({ message: "No encontrado" });
-  res.json(ev);
+  try {
+    // Prevent changing the creator via update
+    if (req.body.creador) delete req.body.creador;
+    const ev = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
+    if (!ev) return res.status(404).json({ message: "No encontrado" });
+    res.json(ev);
+  } catch (error) {
+    res.status(400).json({ error: 'Error al actualizar evento', errorMsg: error?.message || error });
+  }
 };
