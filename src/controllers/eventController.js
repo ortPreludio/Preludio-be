@@ -62,12 +62,68 @@ export const getEventByRole = async (req, res) => {
 };
 
 export const createEvent = async (req, res) => {
-  const ev = await Event.create(req.body);
-  res.status(201).json(ev);
+  try {
+    if (!req.user) return res.status(401).json({ message: 'No autorizado' });
+    const userId = req.user.id || req.user._id;
+    const payload = { ...req.body, creador: userId };
+    const ev = await Event.create(payload);
+    res.status(201).json(ev);
+  } catch (error) {
+    res.status(400).json({ error: 'Error al crear evento', errorMsg: error?.message || error });
+  }
 };
 
 export const updateEvent = async (req, res) => {
-  const ev = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-  if (!ev) return res.status(404).json({ message: "No encontrado" });
-  res.json(ev);
+  try {
+    // Prevent changing the creator via update
+    if (req.body.creador) delete req.body.creador;
+
+    // Accept either nested ubicacion or flat fields (lugar, direccion, ciudad, provincia)
+    const body = { ...req.body };
+    if (!body.ubicacion) {
+      const { lugar, direccion, ciudad, provincia } = body;
+      if (lugar || direccion || ciudad || provincia) {
+        body.ubicacion = {
+          lugar: lugar || undefined,
+          direccion: direccion || undefined,
+          ciudad: ciudad || undefined,
+          provincia: provincia || undefined,
+        };
+        // remove flat fields to avoid accidental top-level writes
+        delete body.lugar; delete body.direccion; delete body.ciudad; delete body.provincia;
+      }
+    }
+
+    // Basic validation
+    const timeRx = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (body.titulo !== undefined && String(body.titulo).trim() === '') {
+      return res.status(400).json({ message: 'Título inválido' });
+    }
+    if (body.descripcion !== undefined && String(body.descripcion).trim() === '') {
+      return res.status(400).json({ message: 'Descripción inválida' });
+    }
+    if (body.fecha !== undefined && Number.isNaN(new Date(body.fecha).getTime())) {
+      return res.status(400).json({ message: 'Fecha inválida' });
+    }
+    if (body.hora !== undefined && !timeRx.test(body.hora)) {
+      return res.status(400).json({ message: 'Hora inválida' });
+    }
+    if (body.ubicacion) {
+      if (!body.ubicacion.lugar || !body.ubicacion.direccion) {
+        return res.status(400).json({ message: 'Ubicación incompleta (lugar y dirección requeridos)' });
+      }
+    }
+    if (body.capacidadTotal !== undefined && Number(body.capacidadTotal) <= 0) {
+      return res.status(400).json({ message: 'Capacidad inválida' });
+    }
+    if (body.precioBase !== undefined && Number(body.precioBase) < 0) {
+      return res.status(400).json({ message: 'Precio inválido' });
+    }
+
+    const ev = await Event.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
+    if (!ev) return res.status(404).json({ message: "No encontrado" });
+    res.json(ev);
+  } catch (error) {
+    res.status(400).json({ error: 'Error al actualizar evento', errorMsg: error?.message || error });
+  }
 };
