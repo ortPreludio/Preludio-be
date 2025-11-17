@@ -6,6 +6,9 @@ const esc = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 export const listUsers = async (req, res) => {
   try {
+    // Only ADMINs may use the paginated listing endpoint
+    if (req.user?.rol !== 'ADMIN') return res.status(403).json({ message: 'Prohibido' });
+
     const { q = "", page = 1, limit = 10, sort = "createdAt", order = "desc" } = req.query;
 
     const pageNum = clamp(parseInt(page, 10) || 1, 1, 10_000);
@@ -25,7 +28,7 @@ export const listUsers = async (req, res) => {
     const [items, total] = await Promise.all([
       User.find(filter)
         .sort({ [sort]: sortDir, _id: sort === "createdAt" ? sortDir : 1 })
-        .skip(skip).limit(perPage).lean(),
+        .skip(skip).limit(perPage).select('-password').lean(),
       User.countDocuments(filter),
     ]);
 
@@ -51,104 +54,135 @@ export const createUser = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const userId = req.user.id; // Asumiendo que tenés middleware de autenticación
-    const { nombre, apellido, dni, email, telefono, fechaNacimiento } = req.body;
+    const userId = req.user.id; // authenticated user
 
-    // Validaciones básicas
-    if (!nombre || !apellido || !dni || !email || !telefono || !fechaNacimiento) {
-      return res.status(400).json({ message: 'Todos los campos son requeridos' });
+    // Fields allowed depending on role:
+    // - ADMIN: may update any user-editable field
+    // - Non-ADMIN: may only update email and telefono
+    const isAdmin = req.user?.rol === 'ADMIN';
+    const allowedFieldsAdmin = ['nombre', 'apellido', 'dni', 'email', 'telefono', 'fechaNacimiento', 'password', 'rol'];
+    const allowedFieldsUser = ['email', 'telefono'];
+
+    const pick = (obj, keys) => keys.reduce((acc, k) => {
+      if (obj[k] !== undefined) acc[k] = obj[k];
+      return acc;
+    }, {});
+
+    const allowed = isAdmin ? pick(req.body, allowedFieldsAdmin) : pick(req.body, allowedFieldsUser);
+
+    // Basic validation: if fields were provided, do lightweight checks
+    if (allowed.nombre !== undefined && String(allowed.nombre).trim() === '') {
+      return res.status(400).json({ message: 'Nombre inválido' });
+    }
+    if (allowed.apellido !== undefined && String(allowed.apellido).trim() === '') {
+      return res.status(400).json({ message: 'Apellido inválido' });
     }
 
-    // Validar formato de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return res.status(400).json({ message: 'Email inválido' });
+    // Validate and normalize fields
+    if (allowed.email !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(String(allowed.email).trim())) return res.status(400).json({ message: 'Email inválido' });
+      allowed.email = String(allowed.email).trim().toLowerCase();
+    }
+    if (allowed.telefono !== undefined) {
+      if (!/^\d{6,15}$/.test(String(allowed.telefono).trim())) return res.status(400).json({ message: 'Teléfono inválido' });
+      allowed.telefono = String(allowed.telefono).trim();
+    }
+    if (allowed.fechaNacimiento !== undefined) {
+      const d = new Date(allowed.fechaNacimiento);
+      if (Number.isNaN(d.getTime())) return res.status(400).json({ message: 'Fecha de nacimiento inválida' });
+      allowed.fechaNacimiento = d;
     }
 
-    // Validar DNI (7-10 dígitos)
-    if (!/^\d{7,10}$/.test(dni)) {
-      return res.status(400).json({ message: 'DNI inválido' });
-    }
+    const updatedUser = await User.findByIdAndUpdate(userId, allowed, { new: true, runValidators: true }).select('-password');
+    if (!updatedUser) return res.status(404).json({ message: 'Usuario no encontrado' });
 
-    // Validar teléfono (6-15 dígitos)
-    if (!/^\d{6,15}$/.test(telefono)) {
-      return res.status(400).json({ message: 'Teléfono inválido' });
-    }
-
-    // Actualizar en la base de datos
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      {
-        nombre: nombre.trim(),
-        apellido: apellido.trim(),
-        dni: dni.trim(),
-        email: email.trim().toLowerCase(),
-        telefono: telefono.trim(),
-        fechaNacimiento
-      },
-      { new: true, runValidators: true }
-    ).select('-password'); // No devolver la contraseña
-
-    if (!updatedUser) {
-      return res.status(404).json({ message: 'Usuario no encontrado' });
-    }
-
-    res.json({ 
-      message: 'Perfil actualizado correctamente',
-      user: updatedUser 
-    });
+    res.json({ message: 'Perfil actualizado correctamente', user: updatedUser });
 
   } catch (error) {
     console.error('Error al actualizar perfil:', error);
-    res.status(500).json({ message: 'Error al actualizar el perfil' });
+    // Return validation error messages when possible to help frontend debugging
+    const msg = error?.message || 'Error al actualizar el perfil';
+    const status = error?.name === 'ValidationError' ? 400 : 500;
+    res.status(status).json({ message: msg });
   }
 };
 
 export const getUserById = async (req, res) => {
-    try {
-        const { id } = req.params;
-        
-        const user = await User.findById(id).select('-password'); // No enviar la contraseña
-        
-        if (!user) {
-            return res.status(404).json({ message: 'Usuario no encontrado' });
-        }
-        
-        res.json(user);
-        
-    } catch (error) {
-        console.error('Error al obtener usuario:', error);
-        res.status(500).json({ error: "Error al obtener usuario", errorMsg: error.message });
+  try {
+    const { id } = req.params;
+
+    // Allow full user object only to ADMINs or the user themself.
+    const isAdmin = req.user?.rol === 'ADMIN';
+    const isSelf = req.user && (String(req.user.id || req.user._id) === String(id));
+
+    const selectFull = isAdmin || isSelf;
+    const user = await User.findById(id).select(selectFull ? '-password' : 'nombre apellido');
+
+    if (!user) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
     }
+
+    res.json(user);
+
+  } catch (error) {
+    console.error('Error al obtener usuario:', error);
+    res.status(500).json({ error: "Error al obtener usuario", errorMsg: error.message });
+  }
 };
 
 // El usuario autenticado ve/edita su propio perfil
 export const getMe = async (req, res) => {
-  const u = await User.findById(req.user.id).lean();
+  const u = await User.findById(req.user.id).select('-password').lean();
   if (!u) return res.status(404).json({ message: "No encontrado" });
   res.json(u);
 };
 
 export const updateMe = async (req, res) => {
-  // limitar campos editables por el usuario final
-  const allowed = (({ nombre, apellido, telefono, fechaNacimiento, password }) =>
-    ({ nombre, apellido, telefono, fechaNacimiento, password }))(req.body);
+  // For /me: allow different sets depending on requester role
+  const isAdmin = req.user?.rol === 'ADMIN';
+  const allowedFieldsAdmin = ['nombre', 'apellido', 'dni', 'email', 'telefono', 'fechaNacimiento', 'password', 'rol'];
+  const allowedFieldsUser = ['email', 'telefono'];
+  const pick = (obj, keys) => keys.reduce((acc, k) => { if (obj[k] !== undefined) acc[k] = obj[k]; return acc; }, {});
+  const allowed = isAdmin ? pick(req.body, allowedFieldsAdmin) : pick(req.body, allowedFieldsUser);
 
-  const u = await User.findByIdAndUpdate(req.user.id, allowed, { new: true, runValidators: true });
+  // Validate common fields
+  if (allowed.email !== undefined) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(String(allowed.email).trim())) return res.status(400).json({ message: 'Email inválido' });
+    allowed.email = String(allowed.email).trim().toLowerCase();
+  }
+  if (allowed.telefono !== undefined) {
+    if (!/^\d{6,15}$/.test(String(allowed.telefono).trim())) return res.status(400).json({ message: 'Teléfono inválido' });
+    allowed.telefono = String(allowed.telefono).trim();
+  }
+  if (allowed.fechaNacimiento !== undefined) {
+    const d = new Date(allowed.fechaNacimiento);
+    if (Number.isNaN(d.getTime())) return res.status(400).json({ message: 'Fecha de nacimiento inválida' });
+    allowed.fechaNacimiento = d;
+  }
+
+  const u = await User.findByIdAndUpdate(req.user.id, allowed, { new: true, runValidators: true }).select('-password');
   if (!u) return res.status(404).json({ message: "No encontrado" });
   res.json(u);
 };
 
 export const getUsers = async (req, res) => {
 
-    try {
-
-        const user = await User.find()
-        res.json(user)
-
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener users", errorMsg: error})
+  try {
+    // If requester is ADMIN return full users (except password).
+    if (req.user?.rol === 'ADMIN') {
+      const users = await User.find().select('-password').lean();
+      return res.json(users);
     }
+
+    // Non-admin or unauthenticated callers get only public fields.
+    const users = await User.find().select('nombre apellido').lean();
+    res.json(users);
+
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener users", errorMsg: error})
+  }
 }
 
 export const getUsersSearch = async (req, res) => {
@@ -156,13 +190,13 @@ export const getUsersSearch = async (req, res) => {
     const {nombre} = req.query
 
     try {
-
-        const user = await User.find({
-            nombre: { 
-                $regex: `^${nombre}`,
-                $options: 'i'}
-        })
-        res.json(user)
+    const projection = req.user?.rol === 'ADMIN' ? '-password' : 'nombre apellido';
+    const user = await User.find({
+      nombre: { 
+        $regex: `^${nombre}`,
+        $options: 'i'}
+    }).select(projection).lean()
+    res.json(user)
 
     } catch (error) {
         res.status(500).json({ error: "Error al obtener users", errorMsg: error})
