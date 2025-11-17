@@ -11,6 +11,6 @@ authRouter.get('/me', requireAuth, async (req, res) => {
   const User = (await import("../models/User.js")).default;
   const u = await User.findById(req.user.id).select('-password').lean();
   if (!u) return res.status(404).json({ message: "No encontrado" });
-  // Return full user (excluding password) so the frontend can display all owned fields
+  // Devolvemos user completo (sin pass) para que el front pueda tener toda la info
   res.json({ user: u });
 });
