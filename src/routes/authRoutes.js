@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { register, login, logout } from '../controllers/authController.js';
+import { register, login, logout, login2 } from '../controllers/authController.js';
 import { requireAuth } from "../middlewares/auth.js";
 
 export const authRouter = Router();
 authRouter.post('/register', register);
 authRouter.post('/login', login);
+authRouter.post('/login2', login2);
 authRouter.post('/logout', logout)
 
 authRouter.get('/me', requireAuth, async (req, res) => {

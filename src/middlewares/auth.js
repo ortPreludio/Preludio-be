@@ -1,12 +1,12 @@
 import jwt from "jsonwebtoken";
 
 function extractToken(req) {
-  const h = req.headers.authorization;
-  const bearer = h?.startsWith("Bearer ") ? h.slice(7) : null;
-  const token = req.cookies?.token || bearer;
+  const header = req.headers?.authorization || req.headers?.Authorization || null;
+  const xAccess = req.headers['x-access-token'] || req.headers['x-access-TOKEN'] || null;
+  const bearer = header && typeof header === 'string' && header.toLowerCase().startsWith('bearer ') ? header.slice(7) : null;
+  const qtoken = req.query?.access_token || req.query?.token || null;
 
-  if (h?.startsWith("Bearer ")) return h.slice(7);
-  return req.cookies?.token || null;
+  return bearer || xAccess || req.cookies?.token || qtoken || null;
 }
 
 export function requireAuth(req, res, next) {

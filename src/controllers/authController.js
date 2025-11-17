@@ -109,6 +109,31 @@ export const login = async (req, res) => {
   }
 };
 
+// Alternate login endpoint that returns a bearer token (no cookies).
+// Useful for API clients (Postman) that want to use Authorization: Bearer <token>.
+export const login2 = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ message: "Faltan credenciales" });
+
+    const emailNorm = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: emailNorm });
+    if (!user) return res.status(401).json({ message: "Credenciales inválidas" });
+
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: "Credenciales inválidas" });
+
+    const access = signAccessToken(user);
+
+    return res.json({
+      token: access,
+      user: { id: user._id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error en login", error: err.message });
+  }
+};
+
 // -------- Refresh (opcional) --------
 export const refreshToken = (req, res) => {
   const token = req.cookies?.refreshToken;
