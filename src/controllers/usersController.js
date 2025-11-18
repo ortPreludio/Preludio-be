@@ -1,4 +1,5 @@
 import User from "../models/User.js";
+import bcrypt from "bcryptjs"; 
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 const esc = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -261,5 +262,32 @@ export const updateUser = async (req, res) => {
       return res.status(409).json({ error: "Email o DNI duplicado" });
     }
     res.status(500).json({ message: 'Error al actualizar el usuario' });
+  }
+};
+
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user.id;
+
+    if (!currentPassword || !newPassword)
+      return res.status(400).json({ message: "Faltan datos" });
+
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ message: "Usuario no encontrado" });
+
+    const ok = await bcrypt.compare(currentPassword, user.password);
+    if (!ok) return res.status(400).json({ message: "La contraseña actual es incorrecta" });
+
+    const hashed = await bcrypt.hash(newPassword, 10);
+    user.password = hashed;
+
+    await user.save();
+
+    res.json({ message: "Contraseña actualizada correctamente" });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Error interno" });
   }
 };

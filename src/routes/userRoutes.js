@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listUsers, getMe, updateMe, getUsers, createUser, getUsersSearch, getUserById, updateUser } from "../controllers/usersController.js";
+import { listUsers, getMe, updateMe, getUsers, createUser, getUsersSearch, getUserById, updateUser, changePassword } from "../controllers/usersController.js";
 import { protegerRuta, roleGate } from "../middlewares/auth.js";
 import { updateProfile } from '../controllers/usersController.js';
 
@@ -13,6 +13,8 @@ usersRouter.post("/", protegerRuta, roleGate("ADMIN"), createUser);
 // Perfil propio
 usersRouter.get("/me", protegerRuta, getMe);
 usersRouter.patch("/me", protegerRuta, updateMe);
+
+usersRouter.put("/change-password", protegerRuta, changePassword);
 
 // Rutas públicas
 usersRouter.get("/", getUsers); //comparar con listUsers
