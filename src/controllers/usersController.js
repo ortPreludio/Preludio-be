@@ -291,3 +291,24 @@ export const changePassword = async (req, res) => {
     res.status(500).json({ message: "Error interno" });
   }
 };
+
+/**
+ * Añade un ticket a la lista de compras realizadas de un usuario.
+ * Devuelve el usuario actualizado o null si no existe.
+ * Esta función está pensada para ser usada por otros controladores (por ejemplo pagosController).
+ */
+export const addPurchase = async (userId, ticketId) => {
+  if (!userId) return null;
+  try {
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      { $addToSet: { comprasRealizadas: ticketId } },
+      { new: true }
+    );
+    return updated;
+  } catch (err) {
+    // No lanzamos error para que el llamador pueda decidir el comportamiento
+    console.error('addPurchase error:', err);
+    return null;
+  }
+};

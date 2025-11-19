@@ -8,6 +8,7 @@ authRouter.post('/login', login);
 authRouter.post('/login2', login2);
 authRouter.post('/logout', logout)
 
+
 authRouter.get('/me', requireAuth, async (req, res) => {
   const User = (await import("../models/User.js")).default;
   const u = await User.findById(req.user.id).select('-password').lean();

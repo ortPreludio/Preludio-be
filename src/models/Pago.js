@@ -1,9 +1,10 @@
-import mongoose from 'mongoose'
+import mongoose from 'mongoose';
+const { Schema, model } = mongoose;
 
-const pagoSchema = mongoose.Schema({
+const pagoSchema = new Schema({
     ticket: {
         type: Schema.Types.ObjectId,
-        ref: 'Ticket', // 'Ticket' debe ser el nombre de tu modelo de Ticket
+        ref: 'Ticket', 
         required: true
     },
 
@@ -13,7 +14,7 @@ const pagoSchema = mongoose.Schema({
     metodo: {
         type: String,
         required: true,
-        enum: ['MercadoPago', 'Tarjeta', 'Efectivo']
+        enum: ['MERCADO_PAGO', 'TARJETA', 'EFECTIVO']
     },
 
     /**
@@ -29,7 +30,8 @@ const pagoSchema = mongoose.Schema({
      */
     fechaPago: {
         type: Date,
-        required: true
+        default: Date.now,
+        immutable: true,
     },
 
     /**
@@ -37,8 +39,8 @@ const pagoSchema = mongoose.Schema({
      */
     estado: {
         type: String,
-        enum: ['Pendiente', 'Completado', 'Fallido'],
-        default: 'Pendiente' // Estado inicial por defecto
+        enum: ['PENDIENTE', 'COMPLETADO', 'FALLIDO'],
+        default: 'PENDIENTE' // Estado inicial por defecto
     },
 
     /**
@@ -58,4 +60,4 @@ const pagoSchema = mongoose.Schema({
     timestamps: true
 });
 
-export default mongoose.model('Pago', pagoSchema);
+export default model('Pago', pagoSchema);
