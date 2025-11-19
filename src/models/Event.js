@@ -11,7 +11,7 @@ const UbicacionSchema = new Schema(
     geo: {
       type: {
         type: String,
-        enum: ['Point'],
+        enum: ['POINT'],
         default: undefined
       },
       coordinates: {
@@ -25,6 +25,17 @@ const UbicacionSchema = new Schema(
 
 const EventSchema = new Schema(
     {
+    /**
+     * Identificador público único del evento.
+     * Se genera automáticamente al crear el documento y es único.
+     * Nota: sigue existiendo `_id` interno de MongoDB; este campo es un id legible/externo.
+     */
+    id: {
+      type: String,
+      unique: true,
+      required: true,
+      default: () => `EV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`
+    },
     titulo: {
         type: String,
         required: true
@@ -37,7 +48,8 @@ const EventSchema = new Schema(
         type: String,
         required: true,
         //tentativos, no son los finales
-        enum: ['Concierto', 'Teatro', 'Deporte', 'Festival', 'Otro'],
+        enum: ['CONCIERTO', 'TEATRO', 'DEPORTE', 'FESTIVAL', 'OTRO'],
+        uppercase: true,
         index: true
     },
     fecha: {
@@ -108,10 +120,10 @@ const EventSchema = new Schema(
     fechaPublicacion: {
         type: Date,
         default: Date.now // Se establece al momento de crear el evento
-    }
+    },
 
-}, 
-{
+
+}, {
     timestamps: true,
     toJSON: { virtuals: true, versionKey: false },
     toObject: { virtuals: true },
@@ -130,8 +142,8 @@ EventSchema.pre('validate', function (next) {
   if (this.isNew && (this.entradasDisponibles == null)) {
     this.entradasDisponibles = this.capacidadTotal;
   }
-  if (this.estadoPublicacion === 'PUBLISHED' && (!this.imagen || !this.buyUrl)) {
-    return next(new Error('imagen y buyUrl son requeridos para estadoPublicacion=PUBLISHED'));
+  if (this.estadoPublicacion === 'PUBLISHED' && (!this.imagen)) {
+    return next(new Error('imagen y son requeridos para estadoPublicacion=PUBLISHED'));
   }
   next();
 });

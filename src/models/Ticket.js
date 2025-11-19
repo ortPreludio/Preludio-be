@@ -1,17 +1,18 @@
-import mongoose from 'mongoose'
+import mongoose from 'mongoose';
+const { Schema, model } = mongoose;
 
-const ticketSchema = mongoose.Schema({
+const ticketSchema = new Schema({
 
     evento: {
         type: Schema.Types.ObjectId,
-        ref: 'Evento', // 'Evento' debe ser el nombre de tu modelo de Evento
+        ref: 'Event', // 'Evento' debe ser el nombre de tu modelo de Evento
         required: true
     },
 
 
     comprador: {
         type: Schema.Types.ObjectId,
-        ref: 'Usuario', // 'Usuario' debe ser el nombre de tu modelo de Usuario
+        ref: 'User', // 'Usuario' debe ser el nombre de tu modelo de Usuario
         required: true
     },
 
@@ -19,7 +20,7 @@ const ticketSchema = mongoose.Schema({
     tipoEntrada: {
         type: String,
         required: true,
-        enum: ['General', 'VIP', 'Premium'] // Define los valores permitidos
+        enum: ['GENERAL', 'VIP', 'PREMIUM'] // Define los valores permitidos
     },
 
 
@@ -43,12 +44,11 @@ const ticketSchema = mongoose.Schema({
 
     estado: {
         type: String,
-        enum: ['Válido', 'Usado', 'Cancelado'],
-        default: 'Válido' // El estado por defecto al crearse
+        enum: ['VALIDO', 'USADO', 'CANCELADO'],
+        default: 'VALIDO' // El estado por defecto al crearse
     }
 }, {
-
     timestamps: true
 });
 
-export default mongoose.model('Ticket', ticketSchema);
+export default model('Ticket', ticketSchema);
