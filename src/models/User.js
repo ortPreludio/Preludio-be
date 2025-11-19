@@ -1,23 +1,29 @@
-import mongoose from 'mongoose'
+import { Schema, model } from 'mongoose';
 
-const userSchema = mongoose.Schema({
+const UserSchema = new Schema(
+    {
     nombre: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     apellido: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     dni: {
         type: String,
         required: true,
-        unique: true // Recomendado para que no se repita
+        unique: true,
+        trim: true 
     },
     email: {
         type: String,
         required: true,
-        unique: true // Recomendado para que no se repita
+        unique: true,
+        trim: true,
+        lowercase: true // Supuestamente mongoose debería convertirlo en minus incluso al hacer un update
     },
     password: {
         type: String,
@@ -29,7 +35,8 @@ const userSchema = mongoose.Schema({
     },
     telefono: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     rol: {
         type: String,
@@ -42,9 +49,8 @@ const userSchema = mongoose.Schema({
     }],
     eventosCreados: [{
         type: Schema.Types.ObjectId,
-        ref: 'Evento' // Referencia al modelo 'Evento'
+        ref: 'Event' // Referencia al modelo 'Event'
     }]
 }, { timestamps: true })
 
-
-export default mongoose.model("User", userSchema)
+export default model("User", UserSchema)

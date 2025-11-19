@@ -1,6 +1,41 @@
-import mongoose from 'mongoose'
+import { Schema, model } from 'mongoose';
 
-const eventSchema = mongoose.Schema({
+const UbicacionSchema = new Schema(
+  {
+    lugar: { type: String, required: true, trim: true },
+    direccion: { type: String, required: true, trim: true },
+    ciudad: { type: String, required: true, trim: true },
+    provincia: { type: String, required: true, trim: true },
+    /* Coords geograficas para orden/filtrado por cercanía, a posteriori estaria 
+     bueno meter api para obtenerlas automaticamente al setearle la ubicación al evento */
+    geo: {
+      type: {
+        type: String,
+        enum: ['POINT'],
+        default: undefined
+      },
+      coordinates: {
+        type: [Number], // [lng, lat]
+        default: undefined
+      }
+    }
+  },
+  { _id: false }
+);
+
+const EventSchema = new Schema(
+    {
+    /**
+     * Identificador público único del evento.
+     * Se genera automáticamente al crear el documento y es único.
+     * Nota: sigue existiendo `_id` interno de MongoDB; este campo es un id legible/externo.
+     */
+    id: {
+      type: String,
+      unique: true,
+      required: true,
+      default: () => `EV-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,9)}`
+    },
     titulo: {
         type: String,
         required: true
@@ -13,7 +48,9 @@ const eventSchema = mongoose.Schema({
         type: String,
         required: true,
         //tentativos, no son los finales
-        enum: ['Concierto', 'Teatro', 'Deporte', 'Festival', 'Otro']
+        enum: ['CONCIERTO', 'TEATRO', 'DEPORTE', 'FESTIVAL', 'OTRO'],
+        uppercase: true,
+        index: true
     },
     fecha: {
         type: Date,
@@ -21,52 +58,46 @@ const eventSchema = mongoose.Schema({
     },
     hora: {
         type: String,
-        required: true // p.ej. "21:00"
+        required: true, // p.ej. "21:00"
+        match: /^([01]\d|2[0-3]):[0-5]\d$/
     },
 
     // Objeto anidado para la ubicación
     ubicacion: {
-        lugar: { type: String, required: true },
-        direccion: { type: String, required: true },
-        ciudad: { type: String, required: true },
-        provincia: { type: String, required: true }
+        type: UbicacionSchema,
+        required: true
     },
 
     // --- Campos de la imagen ---
     // la imagen tiene campos duplicados (precio/precioBase, capacidad/capacidadTotal, etc.)
     // los incluimos todos tal cual están en la imagen.
-
-    precio: { // Duplicado de precioBase
+    // Para no duplicar se usa alias
+    precioBase: { 
         type: Number,
-        required: true
+        required: true,
+        min: 0,
+        alias: 'precio'
     },
-    capacidad: { // Duplicado de capacidadTotal
+    capacidadTotal: { 
         type: Number,
-        required: true
-    },
-    ticketsDisponibles: { // Duplicado de entradasDisponibles
-        type: Number,
-        required: true
-    },
-    capacidadTotal: {
-        type: Number,
-        required: true
+        required: true,
+        min: 0,
+        alias: 'capacidad'
     },
     entradasDisponibles: {
         type: Number,
-        required: true
-    },
-    precioBase: {
-        type: Number,
-        required: true
+        required: true,
+        min: 0,
+        alias: 'ticketsDisponibles'
     },
     // --- Fin de campos duplicados ---
 
     creador: {
         type: Schema.Types.ObjectId,
-        ref: 'Usuario', // Referencia al modelo 'Usuario'
-        required: true
-        // Aquí deberíamos validar en nuestra lógica que este usuario tenga rol 'ADMIN'
+        ref: 'User', // Referencia al modelo 'User'
+        required: true,
+        index: true,
+        immutable: true
     },
 
     imagen: {
@@ -79,23 +110,45 @@ const eventSchema = mongoose.Schema({
         enum: ['Activo', 'Finalizado', 'Cancelado'],
         default: 'Activo'
     },
+    estadoPublicacion: {
+      type: String,
+      enum: ['PENDING', 'PUBLISHED', 'PAST'],
+      default: 'PENDING',
+      index: true,
+    },
 
     fechaPublicacion: {
         type: Date,
         default: Date.now // Se establece al momento de crear el evento
-    }
+    },
+
 
 }, {
-
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true, versionKey: false },
+    toObject: { virtuals: true },
+}
+);
+EventSchema.virtual('inicio').get(function () {
+  if (!this.fecha || !this.hora) return null;
+  const [hh, mm] = (this.hora || '00:00').split(':').map(Number);
+  const d = new Date(this.fecha);
+  d.setHours(hh ?? 0, mm ?? 0, 0, 0);
+  return d;
 });
 
-// Antes de guardar un nuevo evento, seteamos los tickets disponibles igual a la capacidad.
-eventSchema.pre('save', function (next) {
-    if (this.isNew) {
-        this.ticketsDisponibles = this.capacidad;
-    }
-    next();
+// Antes de guardar un nuevo evento, seteamos los tickets disponibles igual a la capacidad y validamos params required para PUBLISHED
+EventSchema.pre('validate', function (next) {
+  if (this.isNew && (this.entradasDisponibles == null)) {
+    this.entradasDisponibles = this.capacidadTotal;
+  }
+  if (this.estadoPublicacion === 'PUBLISHED' && (!this.imagen)) {
+    return next(new Error('imagen y son requeridos para estadoPublicacion=PUBLISHED'));
+  }
+  next();
 });
+EventSchema.index({ estadoPublicacion: 1, fecha: 1, hora: 1, _id: 1 });
+EventSchema.index({ categoria: 1, fecha: 1 });
+EventSchema.index({ 'ubicacion.geo': '2dsphere' });
 
-export default mongoose.model('Event', eventSchema);
+export default model('Event', EventSchema);

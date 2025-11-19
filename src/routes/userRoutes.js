@@ -1,12 +1,39 @@
-import express from 'express'
-import { getUsers, createUser, getUsersSearch } from '../controllers/usersController.js'
+// src/routes/userRoutes.js
+import { Router } from "express";
+import {
+  listUsers,       // listado admin paginado
+  getUsers,        // listado general simple
+  getUsersSearch,
+  getUserById,
+  createUser,
+  getMe,
+  updateMe,
+  updateProfile,
+  changePassword,
+  updateUser,
+} from "../controllers/usersController.js";
+import { requireAuth, requireRole } from "../middlewares/auth.js";
+import { ensureValidObjectId } from "../middlewares/validations.js";
 
-const router = express.Router()
+const usersRouter = Router();
 
-// /api/users/
-router.get("/", getUsers)
-router.get("/search", getUsersSearch)
+const ensureValidUserId = ensureValidObjectId("id", "Usuario");
 
-router.post("/", createUser)
+// --- Rutas ADMIN ---
+usersRouter.get("/", requireAuth, requireRole("ADMIN"), listUsers);
+usersRouter.post("/", requireAuth, requireRole("ADMIN"), createUser);
+usersRouter.put("/:id", requireAuth, requireRole("ADMIN"), ensureValidUserId, updateUser);
 
-export default router
+// --- Perfil propio ---
+usersRouter.get("/me", requireAuth, getMe);
+usersRouter.patch("/me", requireAuth, updateMe);
+usersRouter.put("/me/profile", requireAuth, updateProfile);
+usersRouter.put("/me/change-password", requireAuth, changePassword);
+
+// --- Rutas públicas / generales ---
+// usersRouter.get("/", getUsers); No se que tanto sentido tiene este endpoint
+usersRouter.get("/search", getUsersSearch);
+// Detalle de usuario 
+usersRouter.get("/:id", requireAuth, ensureValidUserId, getUserById);
+
+export { usersRouter };

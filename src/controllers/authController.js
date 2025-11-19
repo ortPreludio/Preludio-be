@@ -1,108 +1,163 @@
 import User from "../models/User.js";
-import bcrypt from "bcryptjs"
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
-const generarAccessToken = (user) => {
-        //JWT.Sign
-        // primer argumento, lo que vas a encriptar
-        // segundo argumento, la llave para encriptar / desencriptar
-        // tercer argumento, el tiempo que va a durar ese token
-    const datosEncriptados = {id: user.id, email: user.email}
+const signAccessToken = (user) =>
+  jwt.sign(
+    { sub: user._id.toString(), rol: user.rol, email: user.email },
+    process.env.JWT_SECRET,
+    { expiresIn: "30m" }
+  );
 
-    const JWT_KEY = process.env.JWT_SECRET
+const signRefreshToken = (user) =>
+  jwt.sign(
+    { sub: user._id.toString() },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: "7d" }
+  );
 
-   return jwt.sign(
-        datosEncriptados,
-        JWT_KEY,
-        { expiresIn: "1h"}
-    )
+/** opciones de cookie (ajusta para prod: secure:true + sameSite:'none') */
+const ACCESS_COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: "lax",     // en prod con otro dominio usa 'none' + secure:true
+  secure: false,       // en prod detrás de HTTPS => true
+  path: "/",
+  maxAge: 30 * 60 * 1000, // 30m
+};
+const REFRESH_COOKIE_OPTS = {
+  httpOnly: true,
+  sameSite: "lax",
+  secure: false,
+  path: "/",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7d
+};
+
+async function hashPasswordIfNeeded(plain) {
+  const saltRounds = 10;
+  return bcrypt.hash(plain, saltRounds);
 }
 
-const generarRefreshToken = (user) => {
+// -------- Register --------
+export const register = async (req, res) => {
+  const { nombre, apellido, dni, email, password, fechaNacimiento, telefono, rol } = req.body || {};
+  if (!nombre || !apellido || !dni || !email || !password || !fechaNacimiento || !telefono) {
+    return res.status(400).json({ message: "Faltan campos requeridos" });
+  }
 
-    return jwt.sign(
-        {id: user.id },
-        process.env.JWT_REFRESH_SECRET,
-        { expiresIn: "7d"} 
-    )
-}
+  // email/dni únicos
+  const exists = await User.findOne({ $or: [{ email: String(email).toLowerCase() }, { dni }] }).lean();
+  if (exists) return res.status(409).json({ message: "Email o DNI ya registrados" });
 
-export const login = async (req, res) =>{
+  // Rol: solo permitir ADMIN si es el primero del sistema
+  let finalRol = "USUARIO";
+  if (rol === "ADMIN") {
+    const admins = await User.countDocuments({ rol: "ADMIN" });
+    if (admins === 0) finalRol = "ADMIN"; else return res.status(403).json({ message: "No autorizado para crear ADMIN" });
+  }
 
+  // ⚠️ Si tu modelo hashea en pre('save'), usa password tal cual acá (sin hash)
+  const passwordToSave = await hashPasswordIfNeeded(password);
 
-    const { email, password } = req.body;
+  const user = await User.create({
+    nombre,
+    apellido,
+    dni,
+    email,
+    password: passwordToSave,
+    fechaNacimiento,
+    telefono,
+    rol: finalRol,
+  });
 
-    if (!email || !password) {
-        res.status(400).json({
-            error: "Faltan Email o Password"
-        })
-    }
+  // emitir cookies
+  const access = signAccessToken(user);
+  const refresh = signRefreshToken(user);
+  res.cookie("token", access, ACCESS_COOKIE_OPTS);
+  res.cookie("refreshToken", refresh, REFRESH_COOKIE_OPTS);
 
-    try {
+  res.status(201).json({
+    user: { id: user._id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
+  });
+};
 
-        const user = await User.findOne({email})
+// -------- Login --------
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ message: "Faltan credenciales" });
 
-        if(!user){
-            return res.status(404).json({error: "Usuario no encontrado"})
-        }
+    const emailNorm = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: emailNorm });
+    if (!user) return res.status(401).json({ message: "Credenciales inválidas" });
 
-        const match = await bcrypt.compare(password, user.password)
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: "Credenciales inválidas" });
 
-        if(!match){
-            return res.status(401).json({error: "Email o Password incorrectos"})
-        }
+    const access = signAccessToken(user);
+    const refresh = signRefreshToken(user);
 
-        const accessToken = generarAccessToken(user)
+    // setear cookies
+    res.cookie("token", access, ACCESS_COOKIE_OPTS);
+    res.cookie("refreshToken", refresh, REFRESH_COOKIE_OPTS);
 
-        const refreshToken = generarRefreshToken(user)
+    // no hace falta devolver el token, el navegador guarda la cookie
+    res.json({
+      user: { id: user._id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error en login", error: err.message });
+  }
+};
 
-        res.cookie('refreshToken', refreshToken,{
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production', // solo https en produccion
-            sameSite: 'strict',
-            maxAge: 1000 * 60 * 60 * 24 * 7
-        })
+// Alternate login endpoint that returns a bearer token (no cookies).
+// Useful for API clients (Postman) that want to use Authorization: Bearer <token>.
+export const login2 = async (req, res) => {
+  try {
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ message: "Faltan credenciales" });
 
-        // Mandar el refresh token como cookie
-        res.json({accessToken})
- 
-    } catch (error) {
-        
-    }
-    
-}
+    const emailNorm = String(email).trim().toLowerCase();
+    const user = await User.findOne({ email: emailNorm });
+    if (!user) return res.status(401).json({ message: "Credenciales inválidas" });
 
+    const ok = await bcrypt.compare(password, user.password);
+    if (!ok) return res.status(401).json({ message: "Credenciales inválidas" });
+
+    const access = signAccessToken(user);
+
+    return res.json({
+      token: access,
+      user: { id: user._id, nombre: user.nombre, apellido: user.apellido, email: user.email, rol: user.rol },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Error en login", error: err.message });
+  }
+};
+
+// -------- Refresh (opcional) --------
 export const refreshToken = (req, res) => {
+  const token = req.cookies?.refreshToken;
+  if (!token) return res.status(401).json({ error: "No hay refreshToken" });
 
-    const token = req.cookies.refreshToken
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
 
-    if(!token){
-        return res.status(401).json({error: 'No hay refresh Token'})
-    }
+    const access = jwt.sign(
+      { sub: decoded.sub },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
 
-    try {
-        
-        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);;
+    res.cookie("token", access, ACCESS_COOKIE_OPTS);
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(401).json({ error: "refreshToken inválido o expirado" });
+  }
+};
 
-        // Si queremos pasarle todos los datos del usuario devuelta, habria que buscar el usuario
-
-        const newAccessToken = jwt.sign(
-            {id: decoded.id},
-            process.env.JWT_SECRET,
-            { expiresIn: '15m'}
-        )
-
-        res.json({accessToken: newAccessToken})
-        
-
-    } catch (error) {
-        
-    }
-}
-
-
+// -------- Logout --------
 export const logout = (req, res) => {
-
-    res.clearCookie('refreshToken')
-    res.json({msg: "Logout Exitoso"})
-}
+  res.clearCookie("token", { ...ACCESS_COOKIE_OPTS, maxAge: undefined });
+  res.clearCookie("refreshToken", { ...REFRESH_COOKIE_OPTS, maxAge: undefined });
+  res.status(204).end();
+};
