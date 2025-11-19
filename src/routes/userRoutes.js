@@ -1,29 +1,46 @@
+// src/routes/userRoutes.js
 import { Router } from "express";
-import { listUsers, getMe, updateMe, getUsers, createUser, getUsersSearch, getUserById, updateUser, changePassword } from "../controllers/usersController.js";
-import { protegerRuta, roleGate } from "../middlewares/auth.js";
-import { updateProfile } from '../controllers/usersController.js';
+import mongoose from "mongoose";
+import {
+  listUsers,       // listado admin paginado
+  getUsers,        // listado general simple
+  getUsersSearch,
+  getUserById,
+  createUser,
+  getMe,
+  updateMe,
+  updateProfile,
+  changePassword,
+  updateUser,
+} from "../controllers/usersController.js";
+import { requireAuth, requireRole } from "../middlewares/auth.js";
 
 const usersRouter = Router();
 
-// GET /api/users  -> lista paginada (solo ADMIN)
-usersRouter.get("/", protegerRuta, roleGate("ADMIN"), listUsers);
-// POST /api/users -> crear (ADMIN)
-usersRouter.post("/", protegerRuta, roleGate("ADMIN"), createUser);
+const ensureValidUserId = (req, res, next) => {
+  const { id } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    // Si no se encuentra el ID retornar 404 not found
+    return res.status(404).json({ message: "Usuario no encontrado" });
+  }
+  next();
+};
 
-// Perfil propio
-usersRouter.get("/me", protegerRuta, getMe);
-usersRouter.patch("/me", protegerRuta, updateMe);
+// --- Rutas ADMIN ---
+usersRouter.get("/", requireAuth, requireRole("ADMIN"), listUsers);
+usersRouter.post("/", requireAuth, requireRole("ADMIN"), createUser);
+usersRouter.put("/:id", requireAuth, requireRole("ADMIN"), ensureValidUserId, updateUser);
 
-usersRouter.put("/change-password", protegerRuta, changePassword);
+// --- Perfil propio ---
+usersRouter.get("/me", requireAuth, getMe);
+usersRouter.patch("/me", requireAuth, updateMe);
+usersRouter.put("/me/profile", requireAuth, updateProfile);
+usersRouter.put("/me/change-password", requireAuth, changePassword);
 
-// Rutas públicas
-usersRouter.get("/", getUsers); //comparar con listUsers
+// --- Rutas públicas / generales ---
+// usersRouter.get("/", getUsers); No se que tanto sentido tiene este endpoint
 usersRouter.get("/search", getUsersSearch);
-usersRouter.get("/:id", protegerRuta, getUserById); // Nueva ruta - debe ir después de /search
-usersRouter.get("/", protegerRuta, getUsers); //comparar con listUsers
-usersRouter.get("/search", protegerRuta, getUsersSearch)
-usersRouter.put('/profile', protegerRuta, updateProfile);
-//nueva ruta para actualizar usuario por id (solo ADMIN)
-usersRouter.put("/:id", protegerRuta, roleGate("ADMIN"), updateUser);
+// Detalle de usuario 
+usersRouter.get("/:id", requireAuth, ensureValidUserId, getUserById);
 
 export { usersRouter };

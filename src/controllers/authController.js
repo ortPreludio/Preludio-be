@@ -6,7 +6,7 @@ const signAccessToken = (user) =>
   jwt.sign(
     { sub: user._id.toString(), rol: user.rol, email: user.email },
     process.env.JWT_SECRET,
-    { expiresIn: "15m" }
+    { expiresIn: "30m" }
   );
 
 const signRefreshToken = (user) =>
@@ -22,7 +22,7 @@ const ACCESS_COOKIE_OPTS = {
   sameSite: "lax",     // en prod con otro dominio usa 'none' + secure:true
   secure: false,       // en prod detrás de HTTPS => true
   path: "/",
-  maxAge: 15 * 60 * 1000, // 15m
+  maxAge: 30 * 60 * 1000, // 30m
 };
 const REFRESH_COOKIE_OPTS = {
   httpOnly: true,
