@@ -1,6 +1,5 @@
 // src/routes/userRoutes.js
 import { Router } from "express";
-import mongoose from "mongoose";
 import {
   listUsers,       // listado admin paginado
   getUsers,        // listado general simple
@@ -14,17 +13,11 @@ import {
   updateUser,
 } from "../controllers/usersController.js";
 import { requireAuth, requireRole } from "../middlewares/auth.js";
+import { ensureValidObjectId } from "../middlewares/validations.js";
 
 const usersRouter = Router();
 
-const ensureValidUserId = (req, res, next) => {
-  const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    // Si no se encuentra el ID retornar 404 not found
-    return res.status(404).json({ message: "Usuario no encontrado" });
-  }
-  next();
-};
+const ensureValidUserId = ensureValidObjectId("id", "Usuario");
 
 // --- Rutas ADMIN ---
 usersRouter.get("/", requireAuth, requireRole("ADMIN"), listUsers);

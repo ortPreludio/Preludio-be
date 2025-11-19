@@ -1,6 +1,5 @@
 // Rutas para Tickets
 import { Router } from 'express';
-import mongoose from "mongoose";
 import {
     createTicket,
     getMyTickets,
@@ -9,16 +8,10 @@ import {
     updateTicket
 } from '../controllers/ticketsController.js';
 import { requireAuth, requireRole } from '../middlewares/auth.js';
+import { ensureValidObjectId } from "../middlewares/validations.js";
 
 const router = Router();
-const ensureValidTicketId = (req, res, next) => {
-  const { id } = req.params;
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    // Si no se encuentra el ID retornar 404 not found
-    return res.status(404).json({ message: "Ticket no encontrado" });
-  }
-  next();
-};
+const ensureValidTicketId = ensureValidObjectId("id", "Ticket");
 
 // Crear ticket (usuario compra o admin crea)
 router.post('/', requireAuth, createTicket);
