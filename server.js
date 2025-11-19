@@ -1,33 +1,43 @@
-import express from "express"
-import dotenv from "dotenv"
-
-import { users } from "./src/data/users.js"
-import { apiRouter } from './src/routes/index.js';
-import ticketsRoutes from './src/routes/ticketsRoutes.js';
-import pagosRoutes from './src/routes/pagosRoutes.js';
-import conectarDB from "./src/config/db.js"
+import express from "express";
+import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { apiRouter } from "./src/routes/index.js";
+import conectarDB from "./src/config/db.js";
 
-dotenv.config()
+dotenv.config();
 
-const app = express()
+const app = express();
+const PORT = process.env.PORT || 3001;
 
-const PORT = process.env.PORT || 3001
-
-conectarDB()
-
-
+// Middlewares base
 app.use(cors({ origin: process.env.FRONT, credentials: true }));
 app.use(cookieParser());
-app.use(express.json())
+app.use(express.json());
 
-app.use('/api/tickets', ticketsRoutes);
-app.use('/api/pagos', pagosRoutes);
+// Rutas API
+app.use("/api", apiRouter);
 
-app.use('/api', apiRouter);
+// 404 genérico para todo lo que no matchee ninguna ruta
+app.use((req, res, next) => {
+  res.status(404).json({ message: "Recurso no encontrado" });
+});
 
-app.listen(PORT, () => {
-    console.log("Servidor corriendo en http://localhost:",PORT);
-})
+// Middleware de error simple
+app.use((err, req, res, next) => {
+  console.error("[ERROR]", err);
+  const status = err.statusCode || 500;
+  const message = err.message || "Error interno del servidor";
+  res.status(status).json({ message });
+});
 
+// Arranque del servidor + conexión a DB
+try {
+  await conectarDB();
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+  });
+} catch (err) {
+  console.error("No se pudo conectar a la base de datos:", err);
+  process.exit(1);
+}
