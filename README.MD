@@ -325,7 +325,7 @@ npm run dev
 
 ---
 
-## 🔑 Credenciales de prueba (completar)
+## 🔑 Credenciales de prueba
 
 ```text
 ADMIN
@@ -336,3 +336,4 @@ USUARIO
 - Email: usuario@preludio.com
 - Password: Password01!
 ```
+
