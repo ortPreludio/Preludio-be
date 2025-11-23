@@ -120,6 +120,42 @@ export const updateEvent = async (req, res) => {
       return res.status(400).json({ message: 'Precio inválido' });
     }
 
+    // actualizar entradasDisponibles automaticamete cuando capacidadTotal cambia
+    // Solo si entradasDisponibles no se proporciona explícitamente en la solicitud
+    if (body.capacidadTotal !== undefined && body.entradasDisponibles === undefined) {
+      // Obtener el evento actual para obtener la antigua capacidadTotal
+      const currentEvent = await Event.findById(req.params.id);
+      if (!currentEvent) return res.status(404).json({ message: "No encontrado" });
+
+      const oldCapacity = currentEvent.capacidadTotal || 0;
+      const newCapacity = Number(body.capacidadTotal);
+      const capacityDifference = newCapacity - oldCapacity;
+
+      // Ajustar las entradas disponibles en base a la diferencia de capacidad
+      const currentAvailable = currentEvent.entradasDisponibles || 0;
+      const newAvailable = Math.max(0, currentAvailable + capacityDifference);
+
+      body.entradasDisponibles = newAvailable;
+    }
+
+    // Si entradasDisponibles es proporcionada, validarla y utilizarla
+    if (body.entradasDisponibles !== undefined) {
+      const availableTickets = Number(body.entradasDisponibles);
+      if (availableTickets < 0) {
+        return res.status(400).json({ message: 'Entradas disponibles no puede ser negativo' });
+      }
+      // Validacion de que las entradas disponibles no excedan la capacidad total
+      const finalCapacity = body.capacidadTotal !== undefined
+        ? Number(body.capacidadTotal)
+        : (await Event.findById(req.params.id))?.capacidadTotal || 0;
+
+      if (availableTickets > finalCapacity) {
+        return res.status(400).json({
+          message: `Entradas disponibles (${availableTickets}) no puede exceder la capacidad total (${finalCapacity})`
+        });
+      }
+    }
+
     const ev = await Event.findByIdAndUpdate(req.params.id, body, { new: true, runValidators: true });
     if (!ev) return res.status(404).json({ message: "No encontrado" });
     res.json(ev);
