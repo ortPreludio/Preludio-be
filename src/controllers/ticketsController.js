@@ -4,6 +4,7 @@ import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
 import Event from '../models/Event.js';
 import { addPurchase } from './usersController.js';
+import crypto from "crypto";
 
 /**
  * Crea un ticket para un usuario programáticamente.
@@ -28,7 +29,7 @@ export const createTicketForUser = async ({ eventoId, compradorId, tipoEntrada, 
     let compradorDoc = null;
     if (compradorId) compradorDoc = await User.findById(compradorId).select('dni nombre apellido');
 
-    const codigoQR = `${ev.id ?? ev._id}-${compradorDoc?.dni ?? compradorId}-${tipoEntrada}`;
+    const codigoQR = ["TICKET",ev._id.toString(),compradorDoc?.dni ?? compradorId,tipoEntrada.toUpperCase(),crypto.randomBytes(4).toString("hex") ].join("|");
 
     const nuevoTicket = new Ticket({
         evento: eventoId,
