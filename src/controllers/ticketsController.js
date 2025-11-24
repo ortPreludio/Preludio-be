@@ -83,7 +83,7 @@ export const getMyTickets = async (req, res) => {
             query = {};
         }
         const tickets = await Ticket.find(query)
-        populate('evento', 'titulo fecha hora imagen ubicacion')
+            .populate('evento', 'titulo fecha hora imagen ubicacion')
             .populate('comprador', 'nombre apellido email')
             .sort({ fechaCompra: -1 });
         if (tickets.length === 0) {
