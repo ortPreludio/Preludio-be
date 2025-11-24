@@ -29,7 +29,7 @@ export const createTicketForUser = async ({ eventoId, compradorId, tipoEntrada, 
     let compradorDoc = null;
     if (compradorId) compradorDoc = await User.findById(compradorId).select('dni nombre apellido');
 
-    const codigoQR = ["TICKET",ev._id.toString(),compradorDoc?.dni ?? compradorId,tipoEntrada.toUpperCase(),crypto.randomBytes(4).toString("hex") ].join("|");
+    const codigoQR = ["TICKET", ev._id.toString(), compradorDoc?.dni ?? compradorId, tipoEntrada.toUpperCase(), crypto.randomBytes(4).toString("hex")].join("|");
 
     const nuevoTicket = new Ticket({
         evento: eventoId,
@@ -83,12 +83,12 @@ export const getMyTickets = async (req, res) => {
             query = {};
         }
         const tickets = await Ticket.find(query)
-            .populate('evento', 'nombre fecha lugar')
+        populate('evento', 'titulo fecha hora imagen ubicacion')
             .populate('comprador', 'nombre apellido email')
             .sort({ fechaCompra: -1 });
-            if (tickets.length === 0) {
-                return res.status(404).json({ message: 'No se encontraron tickets' });
-            }
+        if (tickets.length === 0) {
+            return res.status(404).json({ message: 'No se encontraron tickets' });
+        }
         res.status(200).json(tickets);
     } catch (error) {
         res.status(500).json({ message: error.message });
