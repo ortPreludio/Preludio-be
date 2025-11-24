@@ -1,0 +1,11 @@
+[build]
+  functions = "dist/functions"
+  publish = "public"
+
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "PORT,APP_ENV"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
