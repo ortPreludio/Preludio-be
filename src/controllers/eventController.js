@@ -60,6 +60,19 @@ export const searchEventsByRole = async (req, res) => {
   }
 };
 
+export const getEventCategories = async (req, res) => {
+  try {
+    // Buscar categorías únicas de eventos publicados
+    const categories = await Event.distinct('categoria', {
+      estadoPublicacion: 'PUBLISHED'
+    });
+
+    res.json({ categories: categories.sort() });
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener categorías", errorMsg: error?.message || error });
+  }
+};
+
 export const getEventByRole = async (req, res) => {
   const ev = await Event.findById(req.params.id);
   if (!ev) return res.status(404).json({ message: "No encontrado" });
