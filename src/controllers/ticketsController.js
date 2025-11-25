@@ -166,3 +166,23 @@ export const updateTicket = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Obtener tickets de un usuario específico (solo admin)
+export const getTicketsByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const esAdmin = req.user.rol === 'ADMIN';
+        
+        if (!esAdmin) {
+            return res.status(403).json({ message: 'No autorizado' });
+        }
+
+        const tickets = await Ticket.find({ comprador: userId })
+            .populate('evento', 'titulo fecha ubicacion precio')
+            .sort({ fechaCompra: -1 });
+        
+        res.status(200).json(tickets);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
