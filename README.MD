@@ -196,18 +196,18 @@ Crear un archivo `.env` en la raíz del proyecto con, por ejemplo:
 
 ```env
 # Servidor
-PORT=3001
+PORT=3000
 FRONT=http://localhost:5173
 
 # MongoDB
 MONGODB_URI=mongodb+srv://usuario:password@cluster.mongodb.net
-APP_ENV=staging
-DB_NAME_STAGING=preludio_staging
-DB_NAME_PROD=preludio_prod
+APP_ENV=development
+DB_NAME_STAGING=db_staging
+DB_NAME_PROD=db_prod
 
 # JWT
-JWT_SECRET=super_secret_access_key
-JWT_REFRESH_SECRET=super_secret_refresh_key
+JWT_SECRET=your_jwt_secret
+JWT_REFRESH_SECRET=your_jwt_refresh_secret
 ```
 
 Notas:

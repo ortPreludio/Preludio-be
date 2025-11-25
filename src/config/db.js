@@ -8,7 +8,7 @@ export async function conectarDB() {
   // APP_ENV: 'production' o 'staging' (default)
   const appEnv = process.env.APP_ENV || process.env.NODE_ENV || 'staging';
 
-  // Permite override por flag: node src/index.js --db=Production
+  // Permite override por flag
   const flagDb = process.argv.find(a => a.startsWith('--db='))?.split('=')[1];
 
   // Nombres configurables por .env
