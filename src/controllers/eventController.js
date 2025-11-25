@@ -8,7 +8,7 @@ export const searchEventsByRole = async (req, res) => {
     const {
       q = "", page = 1, limit = 10, sort = "fecha", order = "asc",
       estado, estadoPublicacion, categoria, from, to, ciudad, provincia, lugar,
-      minPrice, maxPrice, available,
+      hideSoldOut,
     } = req.query;
 
     const pageNum = clamp(parseInt(page, 10) || 1, 1, 10_000);
@@ -29,30 +29,13 @@ export const searchEventsByRole = async (req, res) => {
     if (estado) filter.estado = estado;
     if (estadoPublicacion) filter.estadoPublicacion = estadoPublicacion;
     if (categoria) filter.categoria = categoria;
-      // Price range filtering (server-side)
-      if (minPrice !== undefined || maxPrice !== undefined) {
-        const priceFilter = {};
-        const minN = Number(minPrice);
-        const maxN = Number(maxPrice);
-        if (!Number.isNaN(minN)) priceFilter.$gte = minN;
-        if (!Number.isNaN(maxN)) priceFilter.$lte = maxN;
-        // Only add if at least one bound is valid
-        if (Object.keys(priceFilter).length) filter.precioBase = priceFilter;
-      }
-
-      // Availability filter: available=true => entradasDisponibles > 0
-      // available=false => entradasDisponibles == 0
-      if (available !== undefined) {
-        const a = String(available).toLowerCase();
-        if (a === 'true' || a === '1' || a === 'available') {
-          filter.entradasDisponibles = { $gt: 0 };
-        } else if (a === 'false' || a === '0' || a === 'soldout') {
-          filter.entradasDisponibles = { $eq: 0 };
-        }
-      }
     if (ciudad) filter["ubicacion.ciudad"] = new RegExp(esc(ciudad), "i");
     if (provincia) filter["ubicacion.provincia"] = new RegExp(esc(provincia), "i");
     if (lugar) filter["ubicacion.lugar"] = new RegExp(esc(lugar), "i");
+
+    if (hideSoldOut === 'true') {
+      filter.entradasDisponibles = { $gt: 0 };
+    }
 
     if (from || to) {
       filter.fecha = {};
@@ -60,8 +43,11 @@ export const searchEventsByRole = async (req, res) => {
       if (to) filter.fecha.$lte = new Date(to);
     }
 
+    // Permitir ordenar por precio y fecha
     const sortObj = { [sort]: sortDir };
-    if (sort === "fecha") sortObj.hora = sortDir;
+    if (sort === "fecha") {
+      sortObj.hora = sortDir; // Ordenar por hora cuando se ordena por fecha
+    }
 
     const [items, total] = await Promise.all([
       Event.find(filter).sort(sortObj).skip(skip).limit(perPage).lean(),
