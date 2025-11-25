@@ -2,6 +2,9 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "PORT,APP_ENV,DB_NAME_PROD"
+
 [functions]
   directory = "netlify/functions"
 
