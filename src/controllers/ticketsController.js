@@ -4,6 +4,7 @@ import Ticket from '../models/Ticket.js';
 import User from '../models/User.js';
 import Event from '../models/Event.js';
 import { addPurchase } from './usersController.js';
+import crypto from "crypto";
 
 /**
  * Crea un ticket para un usuario programáticamente.
@@ -28,7 +29,7 @@ export const createTicketForUser = async ({ eventoId, compradorId, tipoEntrada, 
     let compradorDoc = null;
     if (compradorId) compradorDoc = await User.findById(compradorId).select('dni nombre apellido');
 
-    const codigoQR = `${ev.id ?? ev._id}-${compradorDoc?.dni ?? compradorId}-${tipoEntrada}`;
+    const codigoQR = ["TICKET", ev._id.toString(), compradorDoc?.dni ?? compradorId, tipoEntrada.toUpperCase(), crypto.randomBytes(4).toString("hex")].join("|");
 
     const nuevoTicket = new Ticket({
         evento: eventoId,
@@ -82,12 +83,12 @@ export const getMyTickets = async (req, res) => {
             query = {};
         }
         const tickets = await Ticket.find(query)
-            .populate('evento', 'nombre fecha lugar')
+            .populate('evento', 'titulo fecha hora imagen ubicacion')
             .populate('comprador', 'nombre apellido email')
             .sort({ fechaCompra: -1 });
-            if (tickets.length === 0) {
-                return res.status(404).json({ message: 'No se encontraron tickets' });
-            }
+        if (tickets.length === 0) {
+            return res.status(404).json({ message: 'No se encontraron tickets' });
+        }
         res.status(200).json(tickets);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -161,6 +162,26 @@ export const updateTicket = async (req, res) => {
             return res.status(404).json({ message: 'Ticket no encontrado' });
         }
         res.status(200).json(ticketActualizado);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// Obtener tickets de un usuario específico (solo admin)
+export const getTicketsByUserId = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const esAdmin = req.user.rol === 'ADMIN';
+        
+        if (!esAdmin) {
+            return res.status(403).json({ message: 'No autorizado' });
+        }
+
+        const tickets = await Ticket.find({ comprador: userId })
+            .populate('evento', 'titulo fecha ubicacion precio')
+            .sort({ fechaCompra: -1 });
+        
+        res.status(200).json(tickets);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
