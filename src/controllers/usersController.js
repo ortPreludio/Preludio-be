@@ -1,39 +1,26 @@
 import User from "../models/User.js";
-import bcrypt from "bcryptjs"; 
-
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-const esc = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
+import bcrypt from "bcryptjs";
+import { getPaginationParams, buildSearchFilter } from '../utils/pagination.js';
 
 export const listUsers = async (req, res) => {
   try {
     // Only ADMINs may use the paginated listing endpoint
     if (req.user?.rol !== 'ADMIN') return res.status(403).json({ message: 'Prohibido' });
 
-    const { q = "", page = 1, limit = 10, sort = "createdAt", order = "desc" } = req.query;
+    const { page, limit, skip, sort, sortDir, q: queryText } = getPaginationParams(req.query);
 
-    const pageNum = clamp(parseInt(page, 10) || 1, 1, 10_000);
-    const perPage = clamp(parseInt(limit, 10) || 10, 1, 100);
-    const skip = (pageNum - 1) * perPage;
-    const sortDir = order === "asc" ? 1 : -1;
-
-    const filter = {};
-    if (q) {
-      const rx = new RegExp(esc(q), "i");
-      filter.$or = [
-        { nombre: rx }, { apellido: rx }, { email: rx },
-        { dni: rx }, { telefono: rx }, { rol: rx },
-      ];
-    }
+    const filter = buildSearchFilter(queryText, [
+      'nombre', 'apellido', 'email', 'dni', 'telefono', 'rol'
+    ]);
 
     const [items, total] = await Promise.all([
       User.find(filter)
         .sort({ [sort]: sortDir, _id: sort === "createdAt" ? sortDir : 1 })
-        .skip(skip).limit(perPage).select('-password').lean(),
+        .skip(skip).limit(limit).select('-password').lean(),
       User.countDocuments(filter),
     ]);
 
-    res.json({ items, total, page: pageNum, limit: perPage });
+    res.json({ items, total, page, limit });
   } catch (error) {
     res.status(500).json({ error: "Error al obtener usuarios", errorMsg: error?.message || error });
   }
@@ -182,26 +169,27 @@ export const getUsers = async (req, res) => {
     res.json(users);
 
   } catch (error) {
-    res.status(500).json({ error: "Error al obtener users", errorMsg: error})
+    res.status(500).json({ error: "Error al obtener users", errorMsg: error })
   }
 }
 
 export const getUsersSearch = async (req, res) => {
 
-    const {nombre} = req.query
+  const { nombre } = req.query
 
-    try {
+  try {
     const projection = req.user?.rol === 'ADMIN' ? '-password' : 'nombre apellido';
     const user = await User.find({
-      nombre: { 
+      nombre: {
         $regex: `^${nombre}`,
-        $options: 'i'}
+        $options: 'i'
+      }
     }).select(projection).lean()
     res.json(user)
 
-    } catch (error) {
-        res.status(500).json({ error: "Error al obtener users", errorMsg: error})
-    }
+  } catch (error) {
+    res.status(500).json({ error: "Error al obtener users", errorMsg: error })
+  }
 }
 
 // metodo para que el admin pueda actualizar cualquier usuario por id
@@ -251,9 +239,9 @@ export const updateUser = async (req, res) => {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
-    res.json({ 
+    res.json({
       message: 'Usuario actualizado correctamente',
-      user: updatedUser 
+      user: updatedUser
     });
 
   } catch (error) {

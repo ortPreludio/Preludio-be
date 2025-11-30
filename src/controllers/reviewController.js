@@ -1,33 +1,23 @@
 import Review from "../models/Review.js";
 
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-const esc = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+import { getPaginationParams, buildSearchFilter } from '../utils/pagination.js';
 
 // LIST - Listar todas las reseñas con paginación y búsqueda
 export const listReviews = async (req, res) => {
   try {
-    const { q = "", page = 1, limit = 10, sort = "createdAt", order = "desc" } = req.query;
+    const { page, limit, skip, sort, sortDir, q: queryText } = getPaginationParams(req.query);
 
-    const pageNum = clamp(parseInt(page, 10) || 1, 1, 10_000);
-    const perPage = clamp(parseInt(limit, 10) || 10, 1, 100);
-    const skip = (pageNum - 1) * perPage;
-    const sortDir = order === "asc" ? 1 : -1;
-
-    const filter = {};
-    if (q) {
-      const rx = new RegExp(esc(q), "i");
-      filter.$or = [{ comment: rx }];
-    }
+    const filter = buildSearchFilter(queryText, ['comment']);
 
     const [items, total] = await Promise.all([
       Review.find(filter)
         .populate('user', 'nombre apellido email')
         .sort({ [sort]: sortDir, _id: sort === "createdAt" ? sortDir : 1 })
-        .skip(skip).limit(perPage).lean(),
+        .skip(skip).limit(limit).lean(),
       Review.countDocuments(filter),
     ]);
 
-    res.json({ items, total, page: pageNum, limit: perPage });
+    res.json({ items, total, page, limit });
   } catch (error) {
     res.status(500).json({ error: "Error al obtener reseñas", errorMsg: error?.message || error });
   }
@@ -59,10 +49,10 @@ export const createReview = async (req, res) => {
       return res.status(409).json({ error: "Ya has creado una reseña" });
     }
 
-    const newReview = await Review.create({ 
-      user: userId, 
-      rating, 
-      comment: comment.trim() 
+    const newReview = await Review.create({
+      user: userId,
+      rating,
+      comment: comment.trim()
     });
 
     await newReview.populate('user', 'nombre apellido email');
@@ -92,16 +82,16 @@ export const getReviews = async (req, res) => {
 export const getReviewById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const review = await Review.findById(id)
       .populate('user', 'nombre apellido email');
-    
+
     if (!review) {
       return res.status(404).json({ message: 'Reseña no encontrada' });
     }
-    
+
     res.json(review);
-    
+
   } catch (error) {
     console.error('Error al obtener reseña:', error);
     res.status(500).json({ error: "Error al obtener reseña", errorMsg: error?.message || error });
@@ -114,11 +104,11 @@ export const getMyReview = async (req, res) => {
     const review = await Review.findOne({ user: req.user.id })
       .populate('user', 'nombre apellido email')
       .lean();
-    
+
     if (!review) {
       return res.status(404).json({ message: "No tienes una reseña creada" });
     }
-    
+
     res.json(review);
   } catch (error) {
     res.status(500).json({ error: "Error al obtener tu reseña", errorMsg: error?.message || error });
@@ -148,9 +138,9 @@ export const updateMyReview = async (req, res) => {
 
     const updatedReview = await Review.findOneAndUpdate(
       { user: userId },
-      { 
-        rating, 
-        comment: comment.trim() 
+      {
+        rating,
+        comment: comment.trim()
       },
       { new: true, runValidators: true }
     ).populate('user', 'nombre apellido email');
@@ -159,9 +149,9 @@ export const updateMyReview = async (req, res) => {
       return res.status(404).json({ message: 'No tienes una reseña para modificar' });
     }
 
-    res.json({ 
+    res.json({
       message: 'Reseña actualizada correctamente',
-      review: updatedReview 
+      review: updatedReview
     });
 
   } catch (error) {
@@ -193,9 +183,9 @@ export const updateReview = async (req, res) => {
 
     const updatedReview = await Review.findByIdAndUpdate(
       id,
-      { 
-        rating, 
-        comment: comment.trim() 
+      {
+        rating,
+        comment: comment.trim()
       },
       { new: true, runValidators: true }
     ).populate('user', 'nombre apellido email');
@@ -204,9 +194,9 @@ export const updateReview = async (req, res) => {
       return res.status(404).json({ message: 'Reseña no encontrada' });
     }
 
-    res.json({ 
+    res.json({
       message: 'Reseña actualizada correctamente',
-      review: updatedReview 
+      review: updatedReview
     });
 
   } catch (error) {

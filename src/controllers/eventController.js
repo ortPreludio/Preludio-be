@@ -1,31 +1,33 @@
 import Event from "../models/Event.js";
 
-const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
-const esc = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+import { getPaginationParams, buildSearchFilter, esc } from '../utils/pagination.js';
 
 export const searchEventsByRole = async (req, res) => {
   try {
+    const queryParams = { ...req.query };
+    if (!queryParams.sort) queryParams.sort = "fecha";
+    if (!queryParams.order) queryParams.order = "asc";
+
     const {
-      q = "", page = 1, limit = 10, sort = "fecha", order = "asc",
+      q = "", page, limit, skip, sort, sortDir,
+    } = getPaginationParams(queryParams);
+
+    const {
       estado, estadoPublicacion, categoria, from, to, ciudad, provincia, lugar,
       hideSoldOut,
     } = req.query;
-
-    const pageNum = clamp(parseInt(page, 10) || 1, 1, 10_000);
-    const perPage = clamp(parseInt(limit, 10) || 10, 1, 100);
-    const skip = (pageNum - 1) * perPage;
-    const sortDir = order === "desc" ? -1 : 1;
 
     const baseFilter = req.user?.rol === "ADMIN" ? {} : { estadoPublicacion: "PUBLISHED" };
     const filter = { ...baseFilter };
 
     if (q) {
-      const rx = new RegExp(esc(q), "i");
-      filter.$or = [
-        { titulo: rx }, { descripcion: rx }, { categoria: rx },
-        { "ubicacion.lugar": rx }, { "ubicacion.ciudad": rx }, { "ubicacion.provincia": rx },
-      ];
+      const searchFilter = buildSearchFilter(q, [
+        'titulo', 'descripcion', 'categoria',
+        'ubicacion.lugar', 'ubicacion.ciudad', 'ubicacion.provincia'
+      ]);
+      Object.assign(filter, searchFilter);
     }
+
     if (estado) filter.estado = estado;
     if (estadoPublicacion) filter.estadoPublicacion = estadoPublicacion;
     if (categoria) filter.categoria = categoria;
@@ -50,11 +52,11 @@ export const searchEventsByRole = async (req, res) => {
     }
 
     const [items, total] = await Promise.all([
-      Event.find(filter).sort(sortObj).skip(skip).limit(perPage).lean(),
+      Event.find(filter).sort(sortObj).skip(skip).limit(limit).lean(),
       Event.countDocuments(filter),
     ]);
 
-    res.json({ items, total, page: pageNum, limit: perPage });
+    res.json({ items, total, page, limit });
   } catch (error) {
     res.status(500).json({ error: "Error al listar eventos", errorMsg: error?.message || error });
   }
